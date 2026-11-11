@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interpolación de Newton</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f5fa;color:#172033}
+header{background:#172b63;color:white;text-align:center;padding:24px 12px}main{max-width:950px;margin:20px auto;padding:0 12px;display:grid;gap:14px}
+.card{background:white;border:1px solid #dce3ee;border-radius:12px;padding:16px}h2{font-size:1.1rem;margin:0 0 12px}
+.row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}label{display:grid;gap:5px;color:#526078;font-size:.9rem;flex:1}
+input{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:7px;font-size:1rem}
+button{background:#3157c8;color:white;border:0;border-radius:8px;padding:10px 14px;font-size:1rem;cursor:pointer}
+.secondary{background:#e8edfb;color:#243b80}.point{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:9px 0}
+.points,.evals{margin:12px 0}.hint{color:#64748b;font-size:.9rem}.error{color:#b42318}.success{color:#137547}
+.scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.9rem}th,td{border:1px solid #dce3ee;padding:8px;text-align:right;white-space:nowrap}th{background:#eef2ff}
+.output{white-space:pre-wrap;overflow-wrap:anywhere;background:#101827;color:#e5edff;border-radius:8px;padding:12px;font-family:monospace}
+canvas{width:100%;height:300px;border:1px solid #dce3ee;border-radius:8px;background:white}
+#results[hidden]{display:none}@media(max-width:500px){.card{padding:12px}}
+</style>
+</head>
+<body>
+<header><h1>Interpolación de Newton</h1><p>Calculadora interactiva · Diferencias divididas · Gráfica</p></header>
+<main>
+<section class="card">
+<h2>1. Ingreso de puntos</h2>
+<div class="row"><label style="max-width:150px">Cantidad de puntos (n)<input id="n" type="number" min="2" max="30" value="3"></label><button id="makePoints">Crear campos</button></div>
+<div id="points" class="points"></div><p class="hint">Los valores de X deben ser distintos. Puedes usar punto o coma decimal.</p>
+</section>
+<section class="card">
+<h2>2. Valores que deseas evaluar (incisos)</h2>
+<div class="row"><label style="max-width:150px">Cantidad de incisos<input id="m" type="number" min="1" max="26" value="2"></label><button id="makeEval" class="secondary">Crear incisos</button></div>
+<div id="evals" class="evals"></div>
+<div class="row"><button id="calculate">Calcular interpolación</button><button id="example" class="secondary">Cargar ejemplo</button></div>
+<div id="message" aria-live="polite"></div>
+</section>
+<div id="results" hidden>
+<section class="card"><h2>3. Tabla de diferencias divididas</h2><div id="table" class="scroll"></div></section>
+<section class="card"><h2>4. Coeficientes</h2><div id="coefficients" class="output"></div></section>
+<section class="card"><h2>5. Polinomio de Newton</h2><div id="polynomial" class="output"></div></section>
+<section class="card"><h2>6. Resultados de los incisos</h2><div id="answers"></div></section>
+<section class="card"><h2>7. Gráfica del polinomio</h2><canvas id="chart" width="1000" height="480"></canvas><p class="hint">Curva: polinomio interpolante. Círculos: puntos originales.</p></section>
+<section class="card"><h2>8. Exportar datos</h2><p class="hint">Descarga 201 puntos para abrirlos en Excel.</p><button id="csv">Descargar datos_grafica.csv</button></section>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);let model=null;
+function number(v,name){let z=Number(String(v).trim().replace(',','.'));if(String(v).trim()===''||!Number.isFinite(z))throw Error(name+': introduce un número válido.');return z}
+function makePoints(data){let n=Math.max(2,Math.min(30,parseInt($('n').value)||2));$('n').value=n;$('points').innerHTML='';for(let i=0;i<n;i++){let d=document.createElement('div');d.className='point';d.innerHTML=`<label>X${i}<input id="x${i}" inputmode="decimal" placeholder="Valor de X"></label><label>Y${i}<input id="y${i}" inputmode="decimal" placeholder="Valor de Y"></label>`;$('points').append(d);if(data&&data[i]){$('x'+i).value=data[i][0];$('y'+i).value=data[i][1]}}}
+function makeEvals(data){let m=Math.max(1,Math.min(26,parseInt($('m').value)||1));$('m').value=m;$('evals').innerHTML='';for(let i=0;i<m;i++){let l=document.createElement('label');l.textContent=`Inciso ${String.fromCharCode(97+i)}) X`;let inp=document.createElement('input');inp.id='v'+i;inp.inputMode='decimal';inp.placeholder='Valor de X';if(data&&data[i]!==undefined)inp.value=data[i];l.append(inp);$('evals').append(l)}}
+function calc(){try{let n=+$('n').value,x=[],y=[],vals=[];for(let i=0;i<n;i++){x.push(number($('x'+i).value,'X'+i));y.push(number($('y'+i).value,'Y'+i))}if(new Set(x).size!==x.length)throw Error('Los valores de X no pueden repetirse.');for(let i=0;i<+$('m').value;i++)vals.push(number($('v'+i).value,'Inciso '+String.fromCharCode(97+i)));
+let t=Array.from({length:n},()=>Array(n).fill(null));for(let i=0;i<n;i++)t[i][0]=y[i];for(let j=1;j<n;j++)for(let i=0;i<n-j;i++)t[i][j]=(t[i+1][j-1]-t[i][j-1])/(x[i+j]-x[i]);let a=t[0].slice();
+function f(z){let r=a[0],p=1;for(let i=1;i<n;i++){p*=z-x[i-1];r+=a[i]*p}return r}
+model={x,y,vals,t,a,f};render();$('results').hidden=false;$('message').innerHTML='<p class="success">Cálculo realizado correctamente.</p>';
+}catch(e){$('message').innerHTML='<p class="error">'+e.message+'</p>';$('results').hidden=true}}
+function fmt(v){return Number(v).toFixed(6).replace(/\.?0+$/,'')}
+function render(){let {x,y,vals,t,a,f}=model,n=x.length,s='<table><tr><th>X</th>';for(let j=0;j<n;j++)s+=`<th>Orden ${j}</th>`;s+='</tr>';for(let i=0;i<n;i++){s+=`<tr><td>${fmt(x[i])}</td>`;for(let j=0;j<n;j++)s+=j<n-i?`<td>${fmt(t[i][j])}</td>`:'<td>—</td>';s+='</tr>'}$('table').innerHTML=s+'</table>';$('coefficients').textContent=a.map((v,i)=>`a${i} = ${fmt(v)}`).join('\n');let p=`P(x) = (${fmt(a[0])})`;for(let i=1;i<n;i++){p+=` + (${fmt(a[i])})`;for(let j=0;j<i;j++)p+=`(x - (${fmt(x[j])}))`}$('polynomial').textContent=p;$('answers').innerHTML=vals.map((v,i)=>`<p><b>Inciso ${String.fromCharCode(97+i)})</b> Para x = ${fmt(v)} → y = <b>${fmt(f(v))}</b></p>`).join('');draw()}
+function draw(){let c=$('chart'),g=c.getContext('2d'),{x,y,vals,f}=model,W=c.width,H=c.height,L=75,R=20,T=20,B=45,lo=Math.min(...x,...vals),hi=Math.max(...x,...vals),mx=(hi-lo)*.12||1;lo-=mx;hi+=mx;let ys=Array.from({length:401},(_,i)=>f(lo+(hi-lo)*i/400)).filter(Number.isFinite),yl=Math.min(...ys,...y),yh=Math.max(...ys,...y),my=(yh-yl)*.12||1;yl-=my;yh+=my;let X=v=>L+(v-lo)/(hi-lo)*(W-L-R),Y=v=>T+(yh-v)/(yh-yl)*(H-T-B);g.clearRect(0,0,W,H);g.font='15px Arial';g.strokeStyle='#e3e8f0';g.fillStyle='#526078';for(let k=0;k<=5;k++){let yy=T+k*(H-T-B)/5;g.beginPath();g.moveTo(L,yy);g.lineTo(W-R,yy);g.stroke();g.fillText((yh-k*(yh-yl)/5).toFixed(2),4,yy+5);let xx=L+k*(W-L-R)/5;g.beginPath();g.moveTo(xx,T);g.lineTo(xx,H-B);g.stroke();g.fillText((lo+k*(hi-lo)/5).toFixed(2),xx-18,H-15)}g.strokeStyle='#3157c8';g.lineWidth=3;g.beginPath();for(let i=0;i<=400;i++){let xx=lo+(hi-lo)*i/400,yy=f(xx);if(i===0)g.moveTo(X(xx),Y(yy));else g.lineTo(X(xx),Y(yy))}g.stroke();x.forEach((v,i)=>{g.beginPath();g.arc(X(v),Y(y[i]),7,0,Math.PI*2);g.fillStyle='#d94841';g.fill()})}
+function csv(){let {x,vals,f}=model,lo=Math.min(...x,...vals),hi=Math.max(...x,...vals),m=(hi-lo)*.1||1;lo-=m;hi+=m;let rows=['x,y'];for(let i=0;i<=200;i++){let z=lo+(hi-lo)*i/200;rows.push(`${z},${f(z)}`)}let blob=new Blob([rows.join('\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='datos_grafica.csv';a.click();URL.revokeObjectURL(url)}
+$('makePoints').onclick=()=>makePoints();$('makeEval').onclick=()=>makeEvals();$('calculate').onclick=calc;$('csv').onclick=csv;$('example').onclick=()=>{$('n').value=3;$('m').value=2;makePoints([[1,1],[2,4],[3,9]]);makeEvals([4,5]);calc()};
+makePoints([[1,1],[2,4],[3,9]]);makeEvals([4,5]);
+</script>
+</body>
+</html>
